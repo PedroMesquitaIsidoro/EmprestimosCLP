@@ -12,6 +12,7 @@
                  [com.zaxxer/HikariCP "4.0.3"]
                  [org.clojure/clojure "1.10.0"]
                  [compojure "1.6.1"]
+                 [ring-middleware-format "0.7.0"]
                  [ring/ring-defaults "0.3.2"]
                  [org.clojure/java.jdbc "0.7.12"]
                  [org.clojure/math.numeric-tower "0.0.1"]

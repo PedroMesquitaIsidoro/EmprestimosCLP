@@ -10,12 +10,12 @@
             [clojure.java.jdbc :as sql]  ; Requer a biblioteca JDBC para interagir com o banco de dados
             [ring.middleware.defaults :refer [wrap-defaults site-defaults]])
   (:gen-class))
-
 ; Configuração do banco de dados MySQL
 (def db-config {:subprotocol "mysql"
-                :subname "//localhost:3306/dados"
-                :user "pedro"
-                :password "password"})
+                ;; :subname "//localhost:3306/dados"
+                 :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
+                :user "root"
+                :password ""})
 
 (defn string-handler [_]
   {:status 200
@@ -94,20 +94,47 @@
    :body (sql/query db-config ["select * from emprestimos"])})
 
 (defn create-emprestimos [request]
-  (let [params (-> request :params)]
+  (let [json-data (:body-params request)]
     (cond
-      (some nil? (vals params))
+      (some nil? (vals json-data))
       {:status 400
        :body "Parâmetros inválidos"}
     
       :else
       (try
-        (insert-emprestimos (get-in params [:data_ini])
-                            (Integer. (get-in params [:parcelas]))
-                            (Float. (get-in params [:taxa_juros]))
-                            (Float. (get-in params [:valor_emprestado])))
+        (insert-emprestimos  (:data_ini json-data)
+                             (:parcelas json-data)
+                             (:taxa_juros json-data)
+                            (:valor_emprestado json-data)
+                            )
         {:status 201
          :body "Empréstimo criado com sucesso"}))))
+
+
+;; (defn create-emprestimos [request]
+;;   (let [json-data (:body-params request)] ; Access the JSON payload
+;;     {:status 200
+;;      :body {:data_ini (:data_ini json-data)
+;;             :user (:user json-data)
+;;             :taxa_juros (:taxa_juros json-data)}}))
+
+
+
+;; (defn create-emprestimos [request]
+;;   (let [parsed-body (-> request :body muuntaja/parse)]
+;;     (if (contains? parsed-body "user")
+;;       {:status 200
+;;        :body (get parsed-body "user")}
+;;       {:status 400
+;;        :body "The 'user' field is missing in the request body"})))
+
+
+
+
+
+
+ 
+
 
 (def app
   (ring/ring-handler
