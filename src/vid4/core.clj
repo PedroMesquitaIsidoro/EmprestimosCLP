@@ -12,16 +12,17 @@
   (:gen-class))
 ; Configuração do banco de dados MySQL
 (def db-config {:subprotocol "mysql"
-                ;; :subname "//localhost:3306/dados"
-                 :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
-                :user "root"
-                :password ""})
+                :subname "//localhost:3306/dados"
+                ;; :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
+                :user "pedro"
+                :password "password"})
 
 (defn string-handler [_]
   {:status 200
    :body "Sistema de emprestimos"})
 
-; Definição do DDL (Data Definition Language) da tabela "emprestimos"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definicoes de tabelas ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Definição  da tabela "emprestimos"
 (def emprestimos-table-ddl
   (sql/create-table-ddl :emprestimos
                         [[:id_emprestimo "int(11)" :primary :key :auto_increment]
@@ -32,6 +33,7 @@
                          [:saldo_devedor :float]
                          [:id_usuario "int(11)"]]))
 
+; Definicao da tabela de parcelas
 (def parcelas-table-ddl
   (sql/create-table-ddl :parcelas
                         [[:id_parcelas "int(11)" :primary :key :auto_increment]
@@ -42,6 +44,31 @@
                           ;; status will be 1 or 0
                          [:id_emprestimo "int(11)"]
                          ["FOREIGN KEY (id_emprestimo) REFERENCES emprestimos (id_emprestimo)"]]))
+
+; Definicao da tabela de simulacao de emprestimo
+(def simulacao-table-ddl
+  (sql/create-table-ddl :simulacao
+                        [[:id_simulacao "int(11)" :primary :key :auto_increment]
+                         [:data_ini :datetime]
+                         [:parcelas :int]
+                         [:taxa_juros :real]
+                         [:valor_emprestado :float]
+                         [:saldo_devedor :float]
+                         [:id_usuario "int(11)"]]))
+
+(def parcelasSimulada-table-ddl
+  (sql/create-table-ddl :parcelasSimulada
+                        [[:id_parcelas "int(11)" :primary :key :auto_increment]
+                         [:numero_parcela "int(4)"]
+                         [:vencimento :date]
+                         [:valor_parcela :float]
+                         [:status :int]
+                          ;; status will be 1 or 0
+                         [:id_simulacao "int(11)"]
+                         ["FOREIGN KEY (id_simulacao) REFERENCES simulacao (id_simulacao)"]]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;FINAL de Definicoes de tabelas ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;Converter datetime to date
 (defn date-str [date]
   (first (str/split date #"T")))
@@ -56,6 +83,12 @@
 
   (sql/insert! db-config :parcelas {:id_emprestimo id-empr :valor_parcela valor_parcela :numero_parcela numero_parcela :vencimento  vencimento :status 0}))
 
+(defn insert-parcelasSimulada [id-empr valor_parcela numero_parcela vencimento]
+
+  (sql/insert! db-config :parcelasSimulada {:id_simulacao id-empr :valor_parcela valor_parcela :numero_parcela numero_parcela :vencimento  vencimento :status 0}))
+
+
+
 ;Função para criar uma instância de empréstimos e associar a n parcelas na outra tabela
 (defn insert-emprestimos [data_ini parcelas taxa_juros valor_emprestado]
 
@@ -67,6 +100,19 @@
                   (insert-parcelas (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas)) parcelas) x (add-1-month (date-str data_ini) x))
 
                   (recur (+ x 1))))))
+
+;Função para criar uma instância de empréstimos simulados e associar a n parcelas na outra tabela
+(defn insert-emprestimosSimulados [data_ini parcelas taxa_juros valor_emprestado]
+
+
+  (let [id_empr (sql/insert! db-config  :simulacao {:data_ini data_ini :parcelas parcelas :taxa_juros taxa_juros :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas))})]
+
+    (loop [x 1] (when (<= x parcelas)
+
+                  (insert-parcelasSimulada (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas)) parcelas) x (add-1-month (date-str data_ini) x))
+
+                  (recur (+ x 1))))))
+
 
 ; Função que verifica se uma tabela existe no banco de dados
 (defn table-exists? [table-name]
@@ -88,6 +134,40 @@
 ; Chama a função para criar a tabela "parcelas" se ela não existir
 (create-tables-if-not-exist)
 
+(defn create-tables-if-not-exist []
+  (when-not (table-exists? "simulacao")
+    (sql/db-do-commands db-config simulacao-table-ddl)))
+
+; Chama a função para criar a tabela "simulacao" se ela não existir
+(create-tables-if-not-exist)
+
+(defn create-tables-if-not-exist []
+  (when-not (table-exists? "parcelasSimulada")
+    (sql/db-do-commands db-config parcelasSimulada-table-ddl)))
+
+; Chama a função para criar a tabela "parcelasSimulada" se ela não existir
+(create-tables-if-not-exist)
+
+
+;ver A SIMULACAO das parcelas
+(defn get-simulacaoParcelas-and-delete [_]
+  (let [select-parcelas-query "SELECT * FROM parcelasSimulada"
+        select-simulacao-query "SELECT * FROM simulacao"]
+    (let [result-parcelas (sql/query db-config select-parcelas-query)
+          result-simulacao (sql/query db-config select-simulacao-query)]
+      (if (and (seq result-parcelas) (seq result-simulacao)) ; Verifica se ambas as consultas retornaram resultados
+        (do
+          (sql/execute! db-config ["DELETE FROM parcelasSimulada"])
+          (sql/execute! db-config ["DELETE FROM simulacao"])
+          {:status 200
+           :body {:resultado-parcelas result-parcelas
+                  :resultado-simulacao result-simulacao
+                  :mensagem "Selecionado e apagado com sucesso."}})
+        {:status 404
+         :body {:resultado-parcelas nil
+                :resultado-simulacao nil
+                :mensagem "Nenhum registro encontrado para o ID especificado."}}))))
+
 ;ver todos os emprestimos
 (defn get-emprestimos [_]
   {:status 200
@@ -99,49 +179,41 @@
       (some nil? (vals json-data))
       {:status 400
        :body "Parâmetros inválidos"}
-    
+
       :else
       (try
         (insert-emprestimos  (:data_ini json-data)
                              (:parcelas json-data)
                              (:taxa_juros json-data)
-                            (:valor_emprestado json-data)
-                            )
+                             (:valor_emprestado json-data))
         {:status 201
          :body "Empréstimo criado com sucesso"}))))
 
+(defn create-simulacao [request]
+  (let [json-data (:body-params request)]
+    (cond
+      (some nil? (vals json-data))
+      {:status 400
+       :body "Parâmetros inválidos"}
 
-;; (defn create-emprestimos [request]
-;;   (let [json-data (:body-params request)] ; Access the JSON payload
-;;     {:status 200
-;;      :body {:data_ini (:data_ini json-data)
-;;             :user (:user json-data)
-;;             :taxa_juros (:taxa_juros json-data)}}))
-
-
-
-;; (defn create-emprestimos [request]
-;;   (let [parsed-body (-> request :body muuntaja/parse)]
-;;     (if (contains? parsed-body "user")
-;;       {:status 200
-;;        :body (get parsed-body "user")}
-;;       {:status 400
-;;        :body "The 'user' field is missing in the request body"})))
-
-
-
-
-
-
- 
+      :else
+      (try
+        (insert-emprestimosSimulados  (:data_ini json-data)
+                                      (:parcelas json-data)
+                                      (:taxa_juros json-data)
+                                      (:valor_emprestado json-data))
+        {:status 201
+         :body "Simulação criada com sucesso"}))))
 
 
 (def app
   (ring/ring-handler
    (ring/router
-    ["/" 
+    ["/"
      ["emprestimos" {:get get-emprestimos
-                     :post create-emprestimos}] 
+                     :post create-emprestimos}]
+     ["simulacao" {:get get-simulacaoParcelas-and-delete
+                   :post create-simulacao}]
      ["" string-handler]]
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware]}})))
