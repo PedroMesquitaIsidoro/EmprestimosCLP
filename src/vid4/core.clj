@@ -111,25 +111,6 @@
          :body "Empréstimo criado com sucesso"}))))
 
 
-;; (defn create-emprestimos [request]
-;;   (let [json-data (:body-params request)] ; Access the JSON payload
-;;     {:status 200
-;;      :body {:data_ini (:data_ini json-data)
-;;             :user (:user json-data)
-;;             :taxa_juros (:taxa_juros json-data)}}))
-
-
-
-;; (defn create-emprestimos [request]
-;;   (let [parsed-body (-> request :body muuntaja/parse)]
-;;     (if (contains? parsed-body "user")
-;;       {:status 200
-;;        :body (get parsed-body "user")}
-;;       {:status 400
-;;        :body "The 'user' field is missing in the request body"})))
-
-
-
 
 
 
