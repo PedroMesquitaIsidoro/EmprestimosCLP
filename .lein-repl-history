@@ -123,3 +123,40 @@ exit
 (start)
 (create-tables-if-not-exist)
 exit
+(start)
+(calculo_saldo_devedor 5001 6)
+exit
+(start)
+exit
+(start)
+exit
+(aprovar_emprestimo? 200 500)
+(aprovar_emprestimo 200 500)
+(aprovar_emprestimo 400 500)
+(aprovar_emprestimo 100 500)
+exit
+(aprovar_emprestimo 100 500)
+(aprovar_emprestimo 300 500)
+(aprovar_emprestimo 149 500)
+(aprovar_emprestimo 150 500)
+(aprovar_emprestimo 151 500)
+exit
+(aprovar_emprestimo 151 500)
+(aprovar_emprestimo 150 500)
+(aprovar_emprestimo 500 500)
+exit
+(aprovar_emprestimo 500 500)
+(aprovar_emprestimo 150 500)
+(aprovar_emprestimo 151 500)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+(calculo_saldo_devedor 500 6)
+exit

@@ -20,9 +20,25 @@
   (.toString(java.time.LocalDateTime/now)))
 
 (defn taxa_juros []
-  0.04
+  0.04)
 
-)
+;Calcula o valor final que o cliente irá pagar
+(defn calculo_saldo_devedor [valor_emprestado parcelas]
+  (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)))
+
+(defn valor_parcela [valor_emprestado parcelas]
+  
+  (/(calculo_saldo_devedor valor_emprestado parcelas) parcelas))
+
+
+(defn aprovar_emprestimo [valor_parcela salario_liquido]
+
+  (if (> valor_parcela (* 0.3 salario_liquido)) false true))
+
+
+
+
+
 (defn string-handler [_]
   {:status 200
    :body "Sistema de emprestimos"})
@@ -100,11 +116,11 @@
 (defn insert-emprestimos [ parcelas  valor_emprestado]
 
 
-  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas))})]
+  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (calculo_saldo_devedor valor_emprestado parcelas)})]
 
     (loop [x 1] (when (<= x parcelas)
 
-                  (insert-parcelas (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)) parcelas) x (add-1-month (date-str (data_ini)) x))
+                  (insert-parcelas (get (first (first id_empr)) 1) (/ (calculo_saldo_devedor valor_emprestado parcelas) parcelas) x (add-1-month (date-str (data_ini)) x))
 
                   (recur (+ x 1))))))
 
@@ -112,11 +128,11 @@
 (defn insert-emprestimosSimulados [parcelas  valor_emprestado]
 
 
-  (let [id_empr (sql/insert! db-config  :simulacao {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas))})]
+  (let [id_empr (sql/insert! db-config  :simulacao {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (calculo_saldo_devedor valor_emprestado parcelas)})]
 
     (loop [x 1] (when (<= x parcelas)
 
-                  (insert-parcelasSimulada (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)) parcelas) x (add-1-month (date-str (data_ini)) x))
+                  (insert-parcelasSimulada (get (first (first id_empr)) 1) (/ (calculo_saldo_devedor valor_emprestado parcelas) parcelas) x (add-1-month (date-str (data_ini)) x))
 
                   (recur (+ x 1))))))
 
@@ -189,11 +205,17 @@
 
       :else
       (try
-        (insert-emprestimos  
+        (if (aprovar_emprestimo (valor_parcela (:valor_emprestado json-data) (:parcelas json-data)) (:salario_liquido json-data))
+        (do(insert-emprestimos  
                              (:parcelas json-data)
                              (:valor_emprestado json-data))
         {:status 201
-         :body "Empréstimo criado com sucesso"}))))
+         :body "Empréstimo criado com sucesso"}
+        
+        )
+        
+        (do  {:status 202
+         :body "Empréstimo recusado"} ))))))
 
 (defn create-simulacao [request]
   (let [json-data (:body-params request)]
