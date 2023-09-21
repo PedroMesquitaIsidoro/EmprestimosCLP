@@ -12,14 +12,21 @@
   (:gen-class))
 ; Configuração do banco de dados MySQL
 (def db-config {:subprotocol "mysql"
-                :subname "//localhost:3306/dados"
+                :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
                 ;; :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
-                :user "pedro"
-                :password "password"})
+                :user "root"
+                :password ""})
+(defn data_ini []
+  (.toString(java.time.LocalDateTime/now)))
 
+(defn taxa_juros []
+  0.04
+
+)
 (defn string-handler [_]
   {:status 200
    :body "Sistema de emprestimos"})
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Definicoes de tabelas ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Definição  da tabela "emprestimos"
@@ -54,7 +61,7 @@
                          [:taxa_juros :real]
                          [:valor_emprestado :float]
                          [:saldo_devedor :float]
-                         [:id_usuario "int(11)"]]))
+                          [:id_usuario "int(11)"]]))
 
 (def parcelasSimulada-table-ddl
   (sql/create-table-ddl :parcelasSimulada
@@ -90,26 +97,26 @@
 
 
 ;Função para criar uma instância de empréstimos e associar a n parcelas na outra tabela
-(defn insert-emprestimos [data_ini parcelas taxa_juros valor_emprestado]
+(defn insert-emprestimos [ parcelas  valor_emprestado]
 
 
-  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini data_ini :parcelas parcelas :taxa_juros taxa_juros :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas))})]
+  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas))})]
 
     (loop [x 1] (when (<= x parcelas)
 
-                  (insert-parcelas (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas)) parcelas) x (add-1-month (date-str data_ini) x))
+                  (insert-parcelas (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)) parcelas) x (add-1-month (date-str (data_ini)) x))
 
                   (recur (+ x 1))))))
 
 ;Função para criar uma instância de empréstimos simulados e associar a n parcelas na outra tabela
-(defn insert-emprestimosSimulados [data_ini parcelas taxa_juros valor_emprestado]
+(defn insert-emprestimosSimulados [parcelas  valor_emprestado]
 
 
-  (let [id_empr (sql/insert! db-config  :simulacao {:data_ini data_ini :parcelas parcelas :taxa_juros taxa_juros :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas))})]
+  (let [id_empr (sql/insert! db-config  :simulacao {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas))})]
 
     (loop [x 1] (when (<= x parcelas)
 
-                  (insert-parcelasSimulada (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 taxa_juros) parcelas)) parcelas) x (add-1-month (date-str data_ini) x))
+                  (insert-parcelasSimulada (get (first (first id_empr)) 1) (/ (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)) parcelas) x (add-1-month (date-str (data_ini)) x))
 
                   (recur (+ x 1))))))
 
@@ -182,9 +189,8 @@
 
       :else
       (try
-        (insert-emprestimos  (:data_ini json-data)
+        (insert-emprestimos  
                              (:parcelas json-data)
-                             (:taxa_juros json-data)
                              (:valor_emprestado json-data))
         {:status 201
          :body "Empréstimo criado com sucesso"}))))
@@ -196,21 +202,13 @@
       {:status 400
        :body "Parâmetros inválidos"}
 
-<<<<<<< HEAD
-
-
-
- 
-=======
       :else
       (try
-        (insert-emprestimosSimulados  (:data_ini json-data)
-                                      (:parcelas json-data)
-                                      (:taxa_juros json-data)
+        (insert-emprestimosSimulados  
+                                      (:parcelas json-data)        
                                       (:valor_emprestado json-data))
         {:status 201
          :body "Simulação criada com sucesso"}))))
->>>>>>> 7fb74379d91f19c8b97cde7c9e11691bc6036c33
 
 
 (def app
