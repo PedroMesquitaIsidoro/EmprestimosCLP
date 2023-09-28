@@ -160,3 +160,52 @@ exit
 (start)
 (calculo_saldo_devedor 500 6)
 exit
+(start)
+exit
+(start)
+exit
+(start)
+(get-emprestimos "id_usuario" : 1)
+(get-emprestimos ("id_usuario": 1))
+(get-emprestimos 1)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+(data_ini)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+(pagar-parcela 1)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit
+(start)
+exit

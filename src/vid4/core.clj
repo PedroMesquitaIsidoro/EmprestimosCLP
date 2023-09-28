@@ -113,10 +113,10 @@
 
 
 ;Função para criar uma instância de empréstimos e associar a n parcelas na outra tabela
-(defn insert-emprestimos [ parcelas  valor_emprestado]
+(defn insert-emprestimos [ parcelas  valor_emprestado id_usuario]
 
 
-  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (calculo_saldo_devedor valor_emprestado parcelas)})]
+  (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (calculo_saldo_devedor valor_emprestado parcelas) :id_usuario id_usuario})]
 
     (loop [x 1] (when (<= x parcelas)
 
@@ -191,10 +191,36 @@
                 :resultado-simulacao nil
                 :mensagem "Nenhum registro encontrado para o ID especificado."}}))))
 
-;ver todos os emprestimos
-(defn get-emprestimos [_]
+;ver todos os emprestimos para um usuario específico
+(defn get-emprestimos [request]
+  (let [json-data (:body-params request)]
   {:status 200
-   :body (sql/query db-config ["select * from emprestimos"])})
+   :body (sql/query db-config ["select * from emprestimos where id_usuario = ?" (:id_usuario json-data)])}))
+
+  ;ver todas as parcelas para um emprestimo específico
+  (defn get-parcelas [request]
+  (let [json-data (:body-params request)]
+  {:status 200
+   :body (sql/query db-config ["select * from parcelas where id_emprestimo = ?" (:id_emprestimo json-data)])}))
+
+  ;atualiza o status para 1, após o pagamento ser efetuado pelo microserviço pagamentos
+  (defn pagar-parcela [request]
+  (let [json-data (:body-params request)]
+    (sql/execute! db-config ["update parcelas set status = 1 where id_parcelas = ?" (:id_parcela json-data) ]))
+  
+    {:status 200
+   :body "Pagamento efetuado"})
+
+
+    (defn simular [request]
+    (let [json-data (:body-params request)]
+    
+  
+    {:status 200
+    :body  {:saldo_devedor (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data))
+            :valor_parcela (/ (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data)) (:parcelas json-data))}}))
+
+
 
 (defn create-emprestimos [request]
   (let [json-data (:body-params request)]
@@ -208,7 +234,8 @@
         (if (aprovar_emprestimo (valor_parcela (:valor_emprestado json-data) (:parcelas json-data)) (:salario_liquido json-data))
         (do(insert-emprestimos  
                              (:parcelas json-data)
-                             (:valor_emprestado json-data))
+                             (:valor_emprestado json-data)
+                             (:id_usuario json-data))
         {:status 201
          :body "Empréstimo criado com sucesso"}
         
@@ -239,7 +266,10 @@
     ["/"
      ["emprestimos" {:get get-emprestimos
                      :post create-emprestimos}]
-     ["simulacao" {:get get-simulacaoParcelas-and-delete
+     ["parcelas" {:get get-parcelas
+                  :put pagar-parcela}]
+                                     
+     ["simulacao" {:get simular
                    :post create-simulacao}]
      ["" string-handler]]
     {:data {:muuntaja m/instance
