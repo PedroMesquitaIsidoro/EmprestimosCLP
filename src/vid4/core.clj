@@ -13,11 +13,12 @@
 ; Configuração do banco de dados MySQL
 (def db-config {:subprotocol "mysql"
                 :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
+                ;;:subname "//localhost:3306/dados"
                 ;; :subname "//127.0.0.1:3306/teste?verifyServerCertificate=false&useSSL=true"
                 :user "root"
                 :password ""})
 (defn data_ini []
-  (.toString(java.time.LocalDateTime/now)))
+  (.toString (java.time.LocalDateTime/now)))
 
 (defn taxa_juros []
   0.04)
@@ -27,8 +28,8 @@
   (* valor_emprestado (math/expt (+ 1 (taxa_juros)) parcelas)))
 
 (defn valor_parcela [valor_emprestado parcelas]
-  
-  (/(calculo_saldo_devedor valor_emprestado parcelas) parcelas))
+
+  (/ (calculo_saldo_devedor valor_emprestado parcelas) parcelas))
 
 
 (defn aprovar_emprestimo [valor_parcela salario_liquido]
@@ -77,7 +78,7 @@
                          [:taxa_juros :real]
                          [:valor_emprestado :float]
                          [:saldo_devedor :float]
-                          [:id_usuario "int(11)"]]))
+                         [:id_usuario "int(11)"]]))
 
 (def parcelasSimulada-table-ddl
   (sql/create-table-ddl :parcelasSimulada
@@ -113,7 +114,7 @@
 
 
 ;Função para criar uma instância de empréstimos e associar a n parcelas na outra tabela
-(defn insert-emprestimos [ parcelas  valor_emprestado id_usuario]
+(defn insert-emprestimos [parcelas  valor_emprestado id_usuario]
 
 
   (let [id_empr (sql/insert! db-config  :emprestimos {:data_ini (data_ini) :parcelas parcelas :taxa_juros (taxa_juros) :valor_emprestado valor_emprestado :saldo_devedor (calculo_saldo_devedor valor_emprestado parcelas) :id_usuario id_usuario})]
@@ -194,31 +195,31 @@
 ;ver todos os emprestimos para um usuario específico
 (defn get-emprestimos [request]
   (let [json-data (:body-params request)]
-  {:status 200
-   :body (sql/query db-config ["select * from emprestimos where id_usuario = ?" (:id_usuario json-data)])}))
+    {:status 200
+     :body (sql/query db-config ["select * from emprestimos where id_usuario = ?" (:id_usuario json-data)])}))
 
   ;ver todas as parcelas para um emprestimo específico
-  (defn get-parcelas [request]
+(defn get-parcelas [request]
   (let [json-data (:body-params request)]
-  {:status 200
-   :body (sql/query db-config ["select * from parcelas where id_emprestimo = ?" (:id_emprestimo json-data)])}))
+    {:status 200
+     :body (sql/query db-config ["select * from parcelas where id_emprestimo = ?" (:id_emprestimo json-data)])}))
 
   ;atualiza o status para 1, após o pagamento ser efetuado pelo microserviço pagamentos
-  (defn pagar-parcela [request]
+(defn pagar-parcela [request]
   (let [json-data (:body-params request)]
-    (sql/execute! db-config ["update parcelas set status = 1 where id_parcelas = ?" (:id_parcela json-data) ]))
-  
-    {:status 200
+    (sql/execute! db-config ["update parcelas set status = 1 where id_parcelas = ?" (:id_parcela json-data)]))
+
+  {:status 200
    :body "Pagamento efetuado"})
 
 
-    (defn simular [request]
-    (let [json-data (:body-params request)]
-    
-  
+(defn simular [request]
+  (let [json-data (:body-params request)]
+
+
     {:status 200
-    :body  {:saldo_devedor (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data))
-            :valor_parcela (/ (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data)) (:parcelas json-data))}}))
+     :body  {:saldo_devedor (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data))
+             :valor_parcela (/ (calculo_saldo_devedor (:valor_emprestado json-data) (:parcelas json-data)) (:parcelas json-data))}}))
 
 
 
@@ -232,17 +233,15 @@
       :else
       (try
         (if (aprovar_emprestimo (valor_parcela (:valor_emprestado json-data) (:parcelas json-data)) (:salario_liquido json-data))
-        (do(insert-emprestimos  
-                             (:parcelas json-data)
-                             (:valor_emprestado json-data)
-                             (:id_usuario json-data))
-        {:status 201
-         :body "Empréstimo criado com sucesso"}
-        
-        )
-        
-        (do  {:status 202
-         :body "Empréstimo recusado"} ))))))
+          (do (insert-emprestimos
+               (:parcelas json-data)
+               (:valor_emprestado json-data)
+               (:id_usuario json-data))
+              {:status 201
+               :body "Empréstimo criado com sucesso"})
+
+          (do  {:status 202
+                :body "Empréstimo recusado"}))))))
 
 (defn create-simulacao [request]
   (let [json-data (:body-params request)]
@@ -253,11 +252,16 @@
 
       :else
       (try
-        (insert-emprestimosSimulados  
-                                      (:parcelas json-data)        
-                                      (:valor_emprestado json-data))
+        (insert-emprestimosSimulados
+         (:parcelas json-data)
+         (:valor_emprestado json-data))
         {:status 201
          :body "Simulação criada com sucesso"}))))
+
+(defn renegociar [request]
+  (let [json-data (:body-params request)]
+    {:status 200
+     :body "Para melhor atender às suas necessidades financeiras e encontrar a melhor solução para seus empréstimos, recomendamos que você visite a agência mais próxima. Ao fazer isso, você poderá discutir diretamente com seu gerente financeiro. Eles estão preparados para ajudá-lo a explorar opções de renegociação que se alinhem com suas circunstâncias individuais e metas financeiras. Não hesite em entrar em contato com eles para iniciar o processo de renegociação. Estamos aqui para apoiá-lo em cada passo do caminho. Obrigado por escolher nossos serviços bancários."}))
 
 
 (def app
@@ -268,9 +272,12 @@
                      :post create-emprestimos}]
      ["parcelas" {:get get-parcelas
                   :put pagar-parcela}]
-                                     
+
      ["simulacao" {:get simular
                    :post create-simulacao}]
+
+     ["renegociar" {:get renegociar}]
+
      ["" string-handler]]
     {:data {:muuntaja m/instance
             :middleware [muuntaja/format-middleware]}})))
